@@ -2,40 +2,40 @@
 #include <QPainter>
 #include <QTime>
 #include <QImage>
+#include <QRgb>
+#include <QColor>
 
 Painting::Painting(QWidget *parent)
     : QWidget(parent),
-      timeStart(QTime::currentTime()),
-      height(350),
-      width(350)
+      p_startingTime(QTime::currentTime()),
+      p_height(350),
+      p_width(350)
 {
 }
 
-void Painting::changeDotsArray()
+
+QImage Painting::drawDots()
 {
-    for (int i = 0; i < height*width; i++)
+    uchar* dotsArray = new uchar[p_width*p_height*4];
+
+    for (int i = 0; i < p_height*p_width; i++)
     {
-        dotsArray[i][0] = 255;
-        dotsArray[i][1] = 0;
-        dotsArray[i][2] = 0;
-        dotsArray[i][3] = 255;
+        dotsArray[i*4] = 200;
+        dotsArray[i*4+1] = (p_startingTime.msecsTo(QTime::currentTime())/10)%255;
+        dotsArray[i*4+2] = 200;
+        dotsArray[i*4+3] = 255;
     }
-
-}
-
-QImage Painting::drawDots(QVector<QRgb> &data)
-{
     QImage image;
-    image.fromData(data,"RGBA");//здесь должна быть функция, переводящая массив в картинку.
-    //Я проверял: если картинка есть, она отрисовывается.
+    image = QImage(dotsArray, p_width, p_height, p_width*4, QImage::Format_ARGB32);
+    update();
     return image;
 }
 
 void Painting::paintEvent(QPaintEvent *)
 {
     QImage dots;
-    dots = drawDots(*dotsArray);
-    QRect borders(0,0,height,width);
+    dots = drawDots();
+    QRect borders(0,0,p_height,p_width);
     QPainter painter;
     painter.begin(this);
     painter.setPen(Qt::NoPen);

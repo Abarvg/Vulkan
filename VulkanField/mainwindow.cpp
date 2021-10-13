@@ -2,11 +2,11 @@
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
-      field(this)
+      m_field(this)
 {
-    field.move(0,0);
-    field.resize(350,350);
-    field.setVisible(true);
+    m_field.move(0,0);
+    m_field.resize(350,350);
+    m_field.setVisible(true);
 }
 
 MainWindow::~MainWindow()
