@@ -1,6 +1,6 @@
 #include "mainwindow.h"
 
-MainWindow::MainWindow(QWidget *parent)
+CMainWindow::CMainWindow(QWidget *parent)
     : QMainWindow(parent),
       m_field(this)
 {
@@ -9,7 +9,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_field.setVisible(true);
 }
 
-MainWindow::~MainWindow()
+CMainWindow::~CMainWindow()
 {
 }
 
