@@ -11,9 +11,9 @@ CPainting::CPainting(QWidget *parent)
       _uHeight_px(350),
       _uWidth_px(350)
 {
-    QTimer* ptimer = new QTimer(this);
-    connect(ptimer,SIGNAL(timeout()),SLOT(update()));
-    ptimer->start(500);
+    QTimer* updateFreq = new QTimer(this);
+    connect(updateFreq,SIGNAL(timeout()),SLOT(update()));
+    updateFreq->start(1000);
     update();
 }
 
