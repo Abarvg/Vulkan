@@ -14,7 +14,7 @@ public:
     QTime    _timeStarting;
     unsigned _uHeight_px;
     unsigned _uWidth_px;
-    uchar*   _pdotsArray;
+    uchar*   _pDotsArray;
     QImage   _image;
 
     void drawDots();
