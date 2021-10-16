@@ -14,8 +14,10 @@ public:
     QTime    _timeStarting;
     unsigned _uHeight_px;
     unsigned _uWidth_px;
+    uchar*   _dotsArray;
+    QImage   _image;
 
-    QImage drawDots();
+    void drawDots();
     void paintEvent(QPaintEvent *);
 
 };
