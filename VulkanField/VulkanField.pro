@@ -11,11 +11,13 @@ CONFIG += c++11
 SOURCES += \
     Painting.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    vulkanComputing.cpp
 
 HEADERS += \
     Painting.h \
-    mainwindow.h
+    mainwindow.h \
+    vulkanComputing.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
