@@ -3,6 +3,11 @@
 
 
 #include <vulkan/vulkan.h>
+#include <vulkan/vk_sdk_platform.h>
+#include <KHR/khrplatform.h>
+#include <QVulkanExtension>
+#include <QVulkanInstance>
+#include <qvulkaninstance.h>
 
 #include <vector>
 #include <string.h>
@@ -67,6 +72,9 @@ public:
     void runCommandBuffer();
 
     void saveRenderedImage();
+
+    uint32_t getComputeQueueFamilyIndex();
+    uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);
 
     void cleanup();
 
