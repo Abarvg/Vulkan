@@ -338,3 +338,171 @@ void CVulkanComputing::createDescriptorSet() {
     vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
 }
 
+uint32_t* readFile(uint32_t& length, const char* filename) {
+
+    FILE* fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        printf("Could not find or open file: %s\n", filename);
+    }
+
+    // get file size.
+    fseek(fp, 0, SEEK_END);
+    long filesize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    long filesizepadded = long(ceil(filesize / 4.0)) * 4;
+
+    // read file contents.
+    char *str = new char[filesizepadded];
+    fread(str, filesize, sizeof(char), fp);
+    fclose(fp);
+
+    // data padding.
+    for (int i = filesize; i < filesizepadded; i++) {
+        str[i] = 0;
+    }
+
+    length = filesizepadded;
+    return (uint32_t *)str;
+}
+
+void CVulkanComputing::createComputePipeline() {
+    /*
+    Create a shader module. A shader module basically just encapsulates some shader code.
+    */
+    uint32_t filelength;
+    // the code in comp.spv was created by running the command:
+    // glslangValidator.exe -V shader.comp
+    uint32_t* code = readFile(filelength, "shaders/comp.spv");
+    VkShaderModuleCreateInfo createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    createInfo.pCode = code;
+    createInfo.codeSize = filelength;
+
+    VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, NULL, &computeShaderModule));
+    delete[] code;
+
+    /*
+    Now let us actually create the compute pipeline.
+    A compute pipeline is very simple compared to a graphics pipeline.
+    It only consists of a single stage with a compute shader.
+
+    So first we specify the compute shader stage, and it's entry point(main).
+    */
+    VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {};
+    shaderStageCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shaderStageCreateInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    shaderStageCreateInfo.module = computeShaderModule;
+    shaderStageCreateInfo.pName = "main";
+
+    /*
+    The pipeline layout allows the pipeline to access descriptor sets.
+    So we just specify the descriptor set layout we created earlier.
+    */
+    VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
+    pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutCreateInfo.setLayoutCount = 1;
+    pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout));
+
+    VkComputePipelineCreateInfo pipelineCreateInfo = {};
+    pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineCreateInfo.stage = shaderStageCreateInfo;
+    pipelineCreateInfo.layout = pipelineLayout;
+
+    VK_CHECK_RESULT(vkCreateComputePipelines(
+        device, VK_NULL_HANDLE,
+        1, &pipelineCreateInfo,
+        NULL, &pipeline));
+}
+
+void CVulkanComputing::createCommandBuffer() {
+    VkCommandPoolCreateInfo commandPoolCreateInfo = {};
+    commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    commandPoolCreateInfo.flags = 0;
+    commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
+    VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
+
+
+    VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
+    commandBufferAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    commandBufferAllocateInfo.commandPool = commandPool;
+    commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // so we can submit the command buffer to queues
+    commandBufferAllocateInfo.commandBufferCount = 1; // allocate a single command buffer.
+    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer));
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // the buffer is only submitted and used once in this application.
+    VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &beginInfo)); // start recording commands.
+
+    /*
+    We need to bind a pipeline, AND a descriptor set before we dispatch.
+    The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
+    */
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+
+    /*
+    Calling vkCmdDispatch basically starts the compute pipeline, and executes the compute shader.
+    The number of workgroups is specified in the arguments.
+    If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
+    */
+    vkCmdDispatch(commandBuffer, (uint32_t)ceil(WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(HEIGHT / float(WORKGROUP_SIZE)), 1);
+
+    VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
+}
+
+void CVulkanComputing::runCommandBuffer() {
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &commandBuffer;
+
+    VkFence fence;
+    VkFenceCreateInfo fenceCreateInfo = {};
+    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fenceCreateInfo.flags = 0;
+    VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
+
+    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+    /*
+    The command will not have finished executing until the fence is signalled.
+    So we wait here.
+    We will directly after this read our buffer from the GPU,
+    and we will not be sure that the command has finished executing unless we wait for the fence.
+    Hence, we use a fence here.
+    */
+    VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
+
+    vkDestroyFence(device, fence, NULL);
+}
+
+void CVulkanComputing::cleanup() {
+    /*
+    Clean up all Vulkan Resources.
+    */
+
+    if (enableValidationLayers) {
+        // destroy callback.
+        auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+        if (func == nullptr) {
+            throw std::runtime_error("Could not load vkDestroyDebugReportCallbackEXT");
+        }
+        func(instance, debugReportCallback, NULL);
+    }
+
+    vkFreeMemory(device, bufferMemory, NULL);
+    vkDestroyBuffer(device, buffer, NULL);
+    vkDestroyShaderModule(device, computeShaderModule, NULL);
+    vkDestroyDescriptorPool(device, descriptorPool, NULL);
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
+    vkDestroyPipelineLayout(device, pipelineLayout, NULL);
+    vkDestroyPipeline(device, pipeline, NULL);
+    vkDestroyCommandPool(device, commandPool, NULL);
+    vkDestroyDevice(device, NULL);
+    vkDestroyInstance(instance, NULL);
+}
+};
+
