@@ -7,7 +7,7 @@
 #include <KHR/khrplatform.h>
 #include <QVulkanExtension>
 #include <QVulkanInstance>
-#include <qvulkaninstance.h>
+#include <QVulkanFunctions>
 
 #include <vector>
 #include <string.h>
@@ -24,13 +24,15 @@ private:
     const int WIDTH;
     const int HEIGHT;
     const int WORKGROUP_SIZE;
-    VkInstance instance;
+    QVulkanInstance instance;
+    QVulkanFunctions* f_instance = instance.functions();
 
     VkDebugReportCallbackEXT debugReportCallback;
 
     VkPhysicalDevice physicalDevice;
 
     VkDevice device;
+    QVulkanDeviceFunctions* df_instance = instance.deviceFunctions(device);
 
     VkPipeline pipeline;
     VkPipelineLayout pipelineLayout;
@@ -48,7 +50,7 @@ private:
 
     uint32_t bufferSize;
 
-    std::vector<const char *> enabledLayers;
+    QByteArrayList enabledLayers;
 
     VkQueue queue;
 

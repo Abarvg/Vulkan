@@ -4,7 +4,10 @@
 #include <KHR/khrplatform.h>
 #include <QVulkanExtension>
 #include <QVulkanInstance>
-#include <qvulkaninstance.h>
+#include <QVersionNumber>
+#include <QVulkanDeviceFunctions>
+#include <QVulkanFunctions>
+
 
 #include <vector>
 #include <string.h>
@@ -77,7 +80,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
 
 
 void CVulkanComputing::createInstance(){
-    std::vector<const char *> enabledExtensions;
+    QByteArrayList enabledExtensions;
 
     if (enableValidationLayers) {
         uint32_t layerCount;
@@ -122,50 +125,40 @@ void CVulkanComputing::createInstance(){
         enabledExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
     }
 
-    VkApplicationInfo applicationInfo = {};
-    applicationInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    applicationInfo.pApplicationName = "Vulkf";
-    applicationInfo.applicationVersion = 0;
-    applicationInfo.pEngineName = "";
-    applicationInfo.engineVersion = 0;
-    applicationInfo.apiVersion = VK_API_VERSION_1_0;;
+    instance.setExtensions(enabledExtensions);
+    instance.setLayers(enabledLayers);
+    QVersionNumber ver(1,0);
+    instance.setApiVersion(ver);
+    if (!instance.create())
+            qFatal("Failed to create Vulkan instance: %d", instance.errorCode());
 
-    VkInstanceCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.flags = 0;
-    createInfo.pApplicationInfo = &applicationInfo;
-    createInfo.enabledLayerCount = enabledLayers.size();
-    createInfo.ppEnabledLayerNames = enabledLayers.data();
-    createInfo.enabledExtensionCount = enabledExtensions.size();
-    createInfo.ppEnabledExtensionNames = enabledExtensions.data();
-
-    VK_CHECK_RESULT(vkCreateInstance(&createInfo, VK_NULL_HANDLE, &instance));
     if (enableValidationLayers) {
         VkDebugReportCallbackCreateInfoEXT createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
         createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
         createInfo.pfnCallback = &debugReportCallbackFn;
 
-
-        auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+        // We have to explicitly load this function.
+        auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance.vkInstance(), "vkCreateDebugReportCallbackEXT");
         if (vkCreateDebugReportCallbackEXT == nullptr) {
             throw std::runtime_error("Could not load vkCreateDebugReportCallbackEXT");
         }
 
-        VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance, &createInfo, NULL, &debugReportCallback));
+        // Create and register callback.
+        VK_CHECK_RESULT(vkCreateDebugReportCallbackEXT(instance.vkInstance(), &createInfo, NULL, &debugReportCallback));
     }
 
 }
 
 void CVulkanComputing::findPhysicalDevice() {
     uint32_t deviceCount;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
+    f_instance->vkEnumeratePhysicalDevices(instance.vkInstance(), &deviceCount, NULL);
     if (deviceCount == 0) {
         throw std::runtime_error("could not find a device with vulkan support");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+    f_instance->vkEnumeratePhysicalDevices(instance.vkInstance(), &deviceCount, devices.data());
 
     for (VkPhysicalDevice device : devices) {
         if (true) {
@@ -178,10 +171,10 @@ void CVulkanComputing::findPhysicalDevice() {
 uint32_t CVulkanComputing::getComputeQueueFamilyIndex() {
     uint32_t queueFamilyCount;
 
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, NULL);
+    f_instance->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, NULL);
 
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
+    f_instance->vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueFamilies.data());
 
 
     uint32_t i = 0;
@@ -217,21 +210,21 @@ void CVulkanComputing::createDevice() {
 
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.enabledLayerCount = enabledLayers.size();  // need to specify validation layers here as well.
-    deviceCreateInfo.ppEnabledLayerNames = enabledLayers.data();
+//    deviceCreateInfo.ppEnabledLayerNames = enabledLayers.data();
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo; // when creating the logical device, we also specify what queues it has.
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-    VK_CHECK_RESULT(vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
+    VK_CHECK_RESULT(instance.functions()->vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
 
-    vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+    df_instance->vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
 }
 
 
 uint32_t CVulkanComputing::findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memoryProperties;
 
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+    f_instance->vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
     /*
     How does this search work?
@@ -253,10 +246,10 @@ void CVulkanComputing::createBuffer() {
     bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VK_CHECK_RESULT(vkCreateBuffer(device, &bufferCreateInfo, NULL, &buffer));
+    VK_CHECK_RESULT(df_instance->vkCreateBuffer(device, &bufferCreateInfo, NULL, &buffer));
 
     VkMemoryRequirements memoryRequirements;
-    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+    df_instance->vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
 
     VkMemoryAllocateInfo allocateInfo = {};
     allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -264,9 +257,9 @@ void CVulkanComputing::createBuffer() {
     allocateInfo.memoryTypeIndex = findMemoryType(
         memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    VK_CHECK_RESULT(vkAllocateMemory(device, &allocateInfo, NULL, &bufferMemory));
+    VK_CHECK_RESULT(df_instance->vkAllocateMemory(device, &allocateInfo, NULL, &bufferMemory));
 
-    VK_CHECK_RESULT(vkBindBufferMemory(device, buffer, bufferMemory, 0));
+    VK_CHECK_RESULT(df_instance->vkBindBufferMemory(device, buffer, bufferMemory, 0));
 }
 
 void CVulkanComputing::createDescriptorSetLayout() {
@@ -291,7 +284,7 @@ void CVulkanComputing::createDescriptorSetLayout() {
     descriptorSetLayoutCreateInfo.pBindings = &descriptorSetLayoutBinding;
 
 
-    VK_CHECK_RESULT(vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
+    VK_CHECK_RESULT(df_instance->vkCreateDescriptorSetLayout(device, &descriptorSetLayoutCreateInfo, NULL, &descriptorSetLayout));
 }
 
 void CVulkanComputing::createDescriptorSet() {
@@ -306,7 +299,7 @@ void CVulkanComputing::createDescriptorSet() {
     descriptorPoolCreateInfo.poolSizeCount = 1;
     descriptorPoolCreateInfo.pPoolSizes = &descriptorPoolSize;
 
-    VK_CHECK_RESULT(vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
+    VK_CHECK_RESULT(df_instance->vkCreateDescriptorPool(device, &descriptorPoolCreateInfo, NULL, &descriptorPool));
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo = {};
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -314,7 +307,7 @@ void CVulkanComputing::createDescriptorSet() {
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &descriptorSetLayout;
 
-    VK_CHECK_RESULT(vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
+    VK_CHECK_RESULT(df_instance->vkAllocateDescriptorSets(device, &descriptorSetAllocateInfo, &descriptorSet));
 
     /*
     Next, we need to connect our actual storage buffer with the descrptor.
@@ -335,7 +328,7 @@ void CVulkanComputing::createDescriptorSet() {
     writeDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writeDescriptorSet.pBufferInfo = &descriptorBufferInfo;
 
-    vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
+    df_instance->vkUpdateDescriptorSets(device, 1, &writeDescriptorSet, 0, NULL);
 }
 
 uint32_t* readFile(uint32_t& length, const char* filename) {
@@ -379,7 +372,7 @@ void CVulkanComputing::createComputePipeline() {
     createInfo.pCode = code;
     createInfo.codeSize = filelength;
 
-    VK_CHECK_RESULT(vkCreateShaderModule(device, &createInfo, NULL, &computeShaderModule));
+    VK_CHECK_RESULT(df_instance->vkCreateShaderModule(device, &createInfo, NULL, &computeShaderModule));
     delete[] code;
 
     /*
@@ -403,14 +396,14 @@ void CVulkanComputing::createComputePipeline() {
     pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
-    VK_CHECK_RESULT(vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout));
+    VK_CHECK_RESULT(df_instance->vkCreatePipelineLayout(device, &pipelineLayoutCreateInfo, NULL, &pipelineLayout));
 
     VkComputePipelineCreateInfo pipelineCreateInfo = {};
     pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineCreateInfo.stage = shaderStageCreateInfo;
     pipelineCreateInfo.layout = pipelineLayout;
 
-    VK_CHECK_RESULT(vkCreateComputePipelines(
+    VK_CHECK_RESULT(df_instance->vkCreateComputePipelines(
         device, VK_NULL_HANDLE,
         1, &pipelineCreateInfo,
         NULL, &pipeline));
@@ -421,7 +414,7 @@ void CVulkanComputing::createCommandBuffer() {
     commandPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     commandPoolCreateInfo.flags = 0;
     commandPoolCreateInfo.queueFamilyIndex = queueFamilyIndex;
-    VK_CHECK_RESULT(vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
+    VK_CHECK_RESULT(df_instance->vkCreateCommandPool(device, &commandPoolCreateInfo, NULL, &commandPool));
 
 
     VkCommandBufferAllocateInfo commandBufferAllocateInfo = {};
@@ -429,28 +422,28 @@ void CVulkanComputing::createCommandBuffer() {
     commandBufferAllocateInfo.commandPool = commandPool;
     commandBufferAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY; // so we can submit the command buffer to queues
     commandBufferAllocateInfo.commandBufferCount = 1; // allocate a single command buffer.
-    VK_CHECK_RESULT(vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer));
+    VK_CHECK_RESULT(df_instance->vkAllocateCommandBuffers(device, &commandBufferAllocateInfo, &commandBuffer));
 
     VkCommandBufferBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // the buffer is only submitted and used once in this application.
-    VK_CHECK_RESULT(vkBeginCommandBuffer(commandBuffer, &beginInfo)); // start recording commands.
+    VK_CHECK_RESULT(df_instance->vkBeginCommandBuffer(commandBuffer, &beginInfo)); // start recording commands.
 
     /*
     We need to bind a pipeline, AND a descriptor set before we dispatch.
     The validation layer will NOT give warnings if you forget these, so be very careful not to forget them.
     */
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
+    df_instance->vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    df_instance->vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSet, 0, NULL);
 
     /*
     Calling vkCmdDispatch basically starts the compute pipeline, and executes the compute shader.
     The number of workgroups is specified in the arguments.
     If you are already familiar with compute shaders from OpenGL, this should be nothing new to you.
     */
-    vkCmdDispatch(commandBuffer, (uint32_t)ceil(WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(HEIGHT / float(WORKGROUP_SIZE)), 1);
+    df_instance->vkCmdDispatch(commandBuffer, (uint32_t)ceil(WIDTH / float(WORKGROUP_SIZE)), (uint32_t)ceil(HEIGHT / float(WORKGROUP_SIZE)), 1);
 
-    VK_CHECK_RESULT(vkEndCommandBuffer(commandBuffer));
+    VK_CHECK_RESULT(df_instance->vkEndCommandBuffer(commandBuffer));
 }
 
 void CVulkanComputing::runCommandBuffer() {
@@ -464,9 +457,9 @@ void CVulkanComputing::runCommandBuffer() {
     VkFenceCreateInfo fenceCreateInfo = {};
     fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceCreateInfo.flags = 0;
-    VK_CHECK_RESULT(vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
+    VK_CHECK_RESULT(df_instance->vkCreateFence(device, &fenceCreateInfo, NULL, &fence));
 
-    VK_CHECK_RESULT(vkQueueSubmit(queue, 1, &submitInfo, fence));
+    VK_CHECK_RESULT(df_instance->vkQueueSubmit(queue, 1, &submitInfo, fence));
     /*
     The command will not have finished executing until the fence is signalled.
     So we wait here.
@@ -474,9 +467,9 @@ void CVulkanComputing::runCommandBuffer() {
     and we will not be sure that the command has finished executing unless we wait for the fence.
     Hence, we use a fence here.
     */
-    VK_CHECK_RESULT(vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
+    VK_CHECK_RESULT(df_instance->vkWaitForFences(device, 1, &fence, VK_TRUE, 100000000000));
 
-    vkDestroyFence(device, fence, NULL);
+    df_instance->vkDestroyFence(device, fence, NULL);
 }
 
 void CVulkanComputing::cleanup() {
@@ -486,23 +479,23 @@ void CVulkanComputing::cleanup() {
 
     if (enableValidationLayers) {
         // destroy callback.
-        auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+        auto func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance.vkInstance(), "vkDestroyDebugReportCallbackEXT");
         if (func == nullptr) {
             throw std::runtime_error("Could not load vkDestroyDebugReportCallbackEXT");
         }
-        func(instance, debugReportCallback, NULL);
+        func(instance.vkInstance(), debugReportCallback, NULL);
     }
 
-    vkFreeMemory(device, bufferMemory, NULL);
-    vkDestroyBuffer(device, buffer, NULL);
-    vkDestroyShaderModule(device, computeShaderModule, NULL);
-    vkDestroyDescriptorPool(device, descriptorPool, NULL);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
-    vkDestroyPipelineLayout(device, pipelineLayout, NULL);
-    vkDestroyPipeline(device, pipeline, NULL);
-    vkDestroyCommandPool(device, commandPool, NULL);
-    vkDestroyDevice(device, NULL);
-    vkDestroyInstance(instance, NULL);
+    df_instance->vkFreeMemory(device, bufferMemory, NULL);
+    df_instance->vkDestroyBuffer(device, buffer, NULL);
+    df_instance->vkDestroyShaderModule(device, computeShaderModule, NULL);
+    df_instance->vkDestroyDescriptorPool(device, descriptorPool, NULL);
+    df_instance->vkDestroyDescriptorSetLayout(device, descriptorSetLayout, NULL);
+    df_instance->vkDestroyPipelineLayout(device, pipelineLayout, NULL);
+    df_instance->vkDestroyPipeline(device, pipeline, NULL);
+    df_instance->vkDestroyCommandPool(device, commandPool, NULL);
+    df_instance->vkDestroyDevice(device, NULL);
+    instance.destroy();
 }
-};
+
 
