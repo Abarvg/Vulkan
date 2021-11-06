@@ -52,6 +52,7 @@ void CPainting::paintEvent(QPaintEvent *)
 
 CPainting::~CPainting()
 {
+
     if (_pDotsArray)
         delete[] _pDotsArray;
 }

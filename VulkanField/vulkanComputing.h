@@ -17,13 +17,19 @@
 
 
 class CVulkanComputing {
+
+public:
+    uchar* _pCompDotsArray;
+
 private:
     struct Pixel {
-        float r, g, b, a;
+        int r, g, b, a;
     };
-    const int WIDTH;
-    const int HEIGHT;
-    const int WORKGROUP_SIZE;
+    float res1;
+    const unsigned WIDTH;
+    const unsigned HEIGHT;
+    const unsigned WORKGROUP_SIZE;
+//    unsigned res2,res3,res4,res5;
     QVulkanInstance instance;
     QVulkanFunctions* f_instance = instance.functions();
 
@@ -73,7 +79,6 @@ public:
 
     void runCommandBuffer();
 
-    void saveRenderedImage();
 
     uint32_t getComputeQueueFamilyIndex();
     uint32_t findMemoryType(uint32_t memoryTypeBits, VkMemoryPropertyFlags properties);

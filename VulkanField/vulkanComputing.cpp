@@ -38,29 +38,32 @@ CVulkanComputing::CVulkanComputing()
       HEIGHT(350),
       WORKGROUP_SIZE(32)
 {
-
-
-
-
+    bufferSize = 0;
+    res1 = 0;
+//    res2 = 0;
+//    res3 = 0;
+//    res4 = 0;
+//    res5 = 0;
+    run();
 };
 
-void CVulkanComputing::run() {
-    bufferSize = sizeof(Pixel) * WIDTH * HEIGHT;
 
+
+
+void CVulkanComputing::run() {
+    bufferSize = (sizeof(Pixel)) * WIDTH * HEIGHT;
     createInstance();
     findPhysicalDevice();
     createDevice();
     createBuffer();
-//    createDescriptorSetLayout();
-//    createDescriptorSet();
-//    createComputePipeline();
-//    createCommandBuffer();
+    createDescriptorSetLayout();
+    createDescriptorSet();
+    createComputePipeline();
+    createCommandBuffer();
 
-//    runCommandBuffer();
+    runCommandBuffer();
 
-//    saveRenderedImage();
-
-//    cleanup();
+    cleanup();
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
@@ -255,7 +258,7 @@ void CVulkanComputing::createBuffer() {
     allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     allocateInfo.allocationSize = memoryRequirements.size;
     allocateInfo.memoryTypeIndex = findMemoryType(
-        memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     VK_CHECK_RESULT(df_instance->vkAllocateMemory(device, &allocateInfo, NULL, &bufferMemory));
 
@@ -498,4 +501,4 @@ void CVulkanComputing::cleanup() {
     instance.destroy();
 }
 
-
+CVulkanComputing::~CVulkanComputing(){};

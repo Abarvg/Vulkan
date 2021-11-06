@@ -2,6 +2,7 @@
 #define PAINTING_H
 #include <QMainWindow>
 #include <QTime>
+#include <vulkanComputing.h>
 
 class CPainting : public QWidget
 {
@@ -11,11 +12,13 @@ public:
     ~CPainting();
 
  protected:
+    CVulkanComputing _vkComp;
     QTime    _timeStarting;
     unsigned _uHeight_px;
     unsigned _uWidth_px;
     uchar*   _pDotsArray;
     QImage   _image;
+
 
     void drawDots();
     void paintEvent(QPaintEvent *);
