@@ -25,20 +25,19 @@ private:
     struct Pixel {
         int r, g, b, a;
     };
-    float res1;
     const unsigned WIDTH;
     const unsigned HEIGHT;
     const unsigned WORKGROUP_SIZE;
 //    unsigned res2,res3,res4,res5;
     QVulkanInstance instance;
-    QVulkanFunctions* f_instance = instance.functions();
+    QVulkanFunctions* f_instance;
 
     VkDebugReportCallbackEXT debugReportCallback;
 
     VkPhysicalDevice physicalDevice;
 
     VkDevice device;
-    QVulkanDeviceFunctions* df_instance = instance.deviceFunctions(device);
+    QVulkanDeviceFunctions* df_instance;
 
     VkPipeline pipeline;
     VkPipelineLayout pipelineLayout;

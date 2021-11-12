@@ -10,6 +10,7 @@
 
 
 #include <vector>
+#include <fstream>
 #include <string.h>
 #include <assert.h>
 #include <stdexcept>
@@ -34,27 +35,29 @@ const bool enableValidationLayers = false;
 
 
 CVulkanComputing::CVulkanComputing()
-     :WIDTH(350),
-      HEIGHT(350),
-      WORKGROUP_SIZE(32)
+     :_pCompDotsArray(0)
+     ,WIDTH(350)
+     ,HEIGHT(350)
+     ,WORKGROUP_SIZE(32)
+     ,instance()
+     ,f_instance(0)
+     ,device()
+     ,df_instance(0)
+     ,bufferSize(0)
+     ,queueFamilyIndex(0)
 {
-    bufferSize = 0;
-    res1 = 0;
-//    res2 = 0;
-//    res3 = 0;
-//    res4 = 0;
-//    res5 = 0;
     run();
-};
+}
 
-
-
-
-void CVulkanComputing::run() {
+void CVulkanComputing::run()
+{
     bufferSize = (sizeof(Pixel)) * WIDTH * HEIGHT;
     createInstance();
+    f_instance = instance.functions();
     findPhysicalDevice();
     createDevice();
+    df_instance = instance.deviceFunctions(device);
+    df_instance->vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
     createBuffer();
     createDescriptorSetLayout();
     createDescriptorSet();
@@ -67,14 +70,14 @@ void CVulkanComputing::run() {
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(
-    VkDebugReportFlagsEXT                       flags,
-    VkDebugReportObjectTypeEXT                  objectType,
-    uint64_t                                    object,
-    size_t                                      location,
-    int32_t                                     messageCode,
+    VkDebugReportFlagsEXT                       /*flags*/,
+    VkDebugReportObjectTypeEXT                  /*objectType*/,
+    uint64_t                                    /*object*/,
+    size_t                                      /*location*/,
+    int32_t                                     /*messageCode*/,
     const char*                                 pLayerPrefix,
     const char*                                 pMessage,
-    void*                                       pUserData) {
+    void*                                       /*pUserData*/) {
 
     printf("Debug Report: %s: %s\n", pLayerPrefix, pMessage);
 
@@ -155,6 +158,7 @@ void CVulkanComputing::createInstance(){
 
 void CVulkanComputing::findPhysicalDevice() {
     uint32_t deviceCount;
+
     f_instance->vkEnumeratePhysicalDevices(instance.vkInstance(), &deviceCount, NULL);
     if (deviceCount == 0) {
         throw std::runtime_error("could not find a device with vulkan support");
@@ -218,9 +222,9 @@ void CVulkanComputing::createDevice() {
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-    VK_CHECK_RESULT(instance.functions()->vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
+    VK_CHECK_RESULT(f_instance->vkCreateDevice(physicalDevice, &deviceCreateInfo, NULL, &device)); // create logical device.
 
-    df_instance->vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+
 }
 
 
@@ -369,7 +373,7 @@ void CVulkanComputing::createComputePipeline() {
     uint32_t filelength;
     // the code in comp.spv was created by running the command:
     // glslangValidator.exe -V shader.comp
-    uint32_t* code = readFile(filelength, "shaders/comp.spv");
+    uint32_t* code = readFile(filelength, "../VulkanField/shaders/comp.spv");
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.pCode = code;

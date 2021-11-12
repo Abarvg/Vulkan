@@ -25,4 +25,6 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 DISTFILES += \
-    shader.comp
+    shaders/comp.spv \
+    shaders/compile.sh \
+    shaders/shader.comp
