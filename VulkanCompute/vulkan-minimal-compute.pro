@@ -10,15 +10,18 @@ LIBS += -lvulkan
 
 HEADERS = \
    $$PWD/src/lodepng.h \
-   ../VulkanField/mainwindow.h \
    src/CComputeApplication.h \
-   src/MainWindow.h \
-   src/const.h
+   src/Painting.h \
+   src/const.h \
+   src/mainwindow.h \
+   src/vulkanComputing.h
 
 SOURCES = \
    $$PWD/src/lodepng.cpp \
    $$PWD/src/main.cpp \
    src/CComputeApplication.cpp \
+    src/Painting.cpp \
+    src/mainwindow.cpp
 
 INCLUDEPATH = \
     $$PWD/src

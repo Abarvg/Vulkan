@@ -1,10 +1,15 @@
 #include "CComputeApplication.h"
 #include <QApplication>
+#include "mainwindow.h"
+#include "const.h"
 
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     CComputeApplication app;
+    CMainWindow w;
+    w.setGeometry(100,100, WIDTH, HEIGHT);
+    w.show();
 
     try {
         app.run();
@@ -14,6 +19,5 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     std::cout << "Hey!";
-    a.exit();
-    return EXIT_SUCCESS;
+    return a.exec();
 }
