@@ -1,5 +1,4 @@
 #include "Painting.h"
-#include "vulkanComputing.h"
 #include "const.h"
 #include <QPainter>
 #include <QTime>
@@ -16,6 +15,12 @@ CPainting::CPainting(QWidget *parent)
     ,_uHeight_px(WIDTH)
     ,_uWidth_px(HEIGHT)
 {
+    try {
+        app.initVulkan();
+    }
+    catch (const std::runtime_error& e) {
+        printf("%s\n", e.what());
+    }
     _pDotsArray = new unsigned char[_uWidth_px*_uHeight_px*4];
     _image = QImage(_pDotsArray, _uWidth_px, _uHeight_px, _uWidth_px*4, QImage::Format_ARGB32);
     QTimer* pTimer = new QTimer(this);
@@ -29,17 +34,19 @@ CPainting::CPainting(QWidget *parent)
 void CPainting::drawDots()
 {
 
-    int iTime_s;
-    int iTime2_s;
-    iTime_s = _timeStarting.secsTo(QTime::currentTime());
-    iTime2_s = _timeStarting.secsTo(QTime::currentTime().addMSecs(500));
-    for (unsigned i = 0; i < _uHeight_px*_uWidth_px; i++)
-    {
-        _pDotsArray[i*4] = 200;
-        _pDotsArray[i*4+1] = 50*(iTime_s)%255;
-        _pDotsArray[i*4+2] = 50*(iTime2_s)%255;
-        _pDotsArray[i*4+3] = 255;
-    }
+    app.runCommandBuffer();
+    app.saveRenderedImage(_pDotsArray);
+//    int iTime_s;
+//    int iTime2_s;
+//    iTime_s = _timeStarting.secsTo(QTime::currentTime());
+//    iTime2_s = _timeStarting.secsTo(QTime::currentTime().addMSecs(500));
+//    for (unsigned i = 0; i < _uHeight_px*_uWidth_px; i++)
+//    {
+//        _pDotsArray[i*4] = 200;
+//        _pDotsArray[i*4+1] = 50*(iTime_s)%255;
+//        _pDotsArray[i*4+2] = 50*(iTime2_s)%255;
+//        _pDotsArray[i*4+3] = 255;
+//    }
 
 }
 
@@ -55,6 +62,7 @@ void CPainting::paintEvent(QPaintEvent *)
 
 CPainting::~CPainting()
 {
+    app.cleanup();
     if (_pDotsArray)
         delete[] _pDotsArray;
 }

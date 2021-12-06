@@ -13,8 +13,7 @@ HEADERS = \
    src/CComputeApplication.h \
    src/Painting.h \
    src/const.h \
-   src/mainwindow.h \
-   src/vulkanComputing.h
+   src/mainwindow.h
 
 SOURCES = \
    $$PWD/src/lodepng.cpp \

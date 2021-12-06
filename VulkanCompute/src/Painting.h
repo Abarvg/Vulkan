@@ -2,7 +2,7 @@
 #define PAINTING_H
 #include <QMainWindow>
 #include <QTime>
-#include <vulkanComputing.h>
+#include <CComputeApplication.h>
 
 class CPainting : public QWidget
 {
@@ -12,6 +12,7 @@ public:
     ~CPainting();
 
  protected:
+    CComputeApplication app;
     QTime    _timeStarting;
     unsigned _uHeight_px;
     unsigned _uWidth_px;

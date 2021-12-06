@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <stdexcept>
 #include <cmath>
+#include <const.h>
 
 class CComputeApplication {
 public:
@@ -34,7 +35,7 @@ public:
     std::vector<const char *> enabledLayers;
     VkQueue queue;
     uint32_t queueFamilyIndex;
-    void run();
+    void initVulkan();
 
     void createInstance();
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallbackFn(VkDebugReportFlagsEXT, VkDebugReportObjectTypeEXT, uint64_t, size_t, int32_t, const char* pLayerPrefix, const char* pMessage, void*){
@@ -54,7 +55,7 @@ public:
 
     void runCommandBuffer();
 
-    void saveRenderedImage();
+    void saveRenderedImage(unsigned char* imageArray);
     void cleanup();
     CComputeApplication();
     ~CComputeApplication();

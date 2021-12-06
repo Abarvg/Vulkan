@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <stdexcept>
 #include <cmath>
+#include <QString>
 
 #include "CComputeApplication.h"
 #include "lodepng.h"
@@ -36,7 +37,7 @@ CComputeApplication::CComputeApplication()
 {
 }
 
-void CComputeApplication::run() {
+void CComputeApplication::initVulkan() {
     // Buffer size of the storage buffer that will contain the rendered mandelbrot set.
     bufferSize = sizeof(Pixel) * WIDTH * HEIGHT;
 
@@ -49,40 +50,32 @@ void CComputeApplication::run() {
     createDescriptorSet();
     createComputePipeline();
     createCommandBuffer();
-
-    // Finally, run the recorded command buffer.
-    runCommandBuffer();
-
-    // The former command rendered a mandelbrot set to a buffer.
-    // Save that buffer as a png on disk.
-    saveRenderedImage();
-
-    // Clean up all vulkan resources.
-    cleanup();
 }
 
-void CComputeApplication::saveRenderedImage() {
+
+
+void CComputeApplication::saveRenderedImage(unsigned char* imageArray) {
     void* mappedMemory = NULL;
     // Map the buffer memory, so that we can read from it on the CPU.
     vkMapMemory(device, bufferMemory, 0, bufferSize, 0, &mappedMemory);
     Pixel* pmappedMemory = (Pixel *)mappedMemory;
 
-    // Get the color data from the buffer, and cast it to bytes.
-    // We save the data to a vector.
-    std::vector<unsigned char> image;
-    image.reserve(WIDTH * HEIGHT * 4);
     for (int i = 0; i < WIDTH*HEIGHT; i += 1) {
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].r)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].g)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].b)));
-        image.push_back((unsigned char)(255.0f * (pmappedMemory[i].a)));
+        imageArray[i*4+2] = (unsigned char)(255.0f * (pmappedMemory[i].r)); // b
+        imageArray[i*4+1] = (unsigned char)(255.0f * (pmappedMemory[i].g)); // g
+        imageArray[i*4] = (unsigned char)(255.0f * (pmappedMemory[i].b)); // r
+        imageArray[i*4+3] = (unsigned char)(255.0f * (pmappedMemory[i].a)); // a
     }
+//     std::cout << ceil(((unsigned char)(255.0f * (pmappedMemory[0].r))))
+//               << ceil(((unsigned char)(255.0f * (pmappedMemory[0].g))))
+//               << ceil(((unsigned char)(255.0f * (pmappedMemory[0].b))))
+//               << ceil(((unsigned char)(255.0f * (pmappedMemory[0].a)))) << std::endl ;
     // Done reading, so unmap.
     vkUnmapMemory(device, bufferMemory);
 
     // Now we save the acquired color data to a .png.
-    unsigned error = lodepng::encode("/home/sms/src/VulkanCompute/mandelbrot.png", image, WIDTH, HEIGHT);
-    if (error) printf("encoder error %d: %s", error, lodepng_error_text(error));
+    //unsigned error = lodepng::encode("/home/sms/src/VulkanCompute/mandelbrot.png", image, WIDTH, HEIGHT);
+    //if (error) printf("encoder error %d: %s", error, lodepng_error_text(error));
 }
 
 
@@ -517,7 +510,7 @@ void CComputeApplication::createComputePipeline() {
     uint32_t filelength;
     // the code in comp.spv was created by running the command:
     // glslangValidator.exe -V shader.comp
-    uint32_t* code = readFile(filelength,"/home/sms/src/vulkan_minimal_compute/shaders/comp.spv");
+    uint32_t* code = readFile(filelength,"/home/sms/src/VulkanCompute/shaders/comp.spv");
     VkShaderModuleCreateInfo createInfo = {};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.pCode = code;
